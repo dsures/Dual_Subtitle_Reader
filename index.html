@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dual Subtitle Reader — YouTube Player Concept</title>
+<style>
+  :root {
+    --yt-bg: #0f0f0f;
+    --yt-surface: #1c1c1c;
+    --yt-text: #f1f1f1;
+    --yt-muted: #aaaaaa;
+    --yt-accent: #4a6b5d;
+    --accent-soft: #22302a;
+    --accent-border: #35493f;
+    --divider: #2a2a2a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(74,107,93,0.25), transparent 60%),
+      radial-gradient(1000px 500px at 110% 20%, rgba(160,110,60,0.18), transparent 55%),
+      radial-gradient(900px 600px at 50% 110%, rgba(74,107,93,0.15), transparent 60%),
+      linear-gradient(160deg, #f2efe8 0%, #e8e4da 100%);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    color: var(--yt-text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 12px 60px;
+    min-height: 100vh;
+  }
+
+  /* coming-soon hype banner */
+  .hype {
+    max-width: 430px;
+    margin-bottom: 22px;
+    text-align: center;
+    background: linear-gradient(135deg, #4a6b5d, #2f4a3e);
+    border-radius: 18px;
+    padding: 18px 22px;
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(47,74,62,0.35);
+    position: relative;
+    overflow: hidden;
+  }
+  .hype::before { /* subtle shine sweep */
+    content: "";
+    position: absolute; top: 0; bottom: 0; width: 60px;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.18), transparent);
+    left: -80px;
+    animation: shine 4s ease-in-out infinite;
+  }
+  @keyframes shine {
+    0%, 60% { left: -80px; }
+    100%    { left: 110%; }
+  }
+  .hype .h-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 999px;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    margin-bottom: 8px;
+  }
+  .hype .h-title { font-family: Georgia, serif; font-size: 1.25rem; margin-bottom: 6px; }
+  .hype .h-text { font-size: 0.72rem; line-height: 1.6; color: #d9e6df; }
+  .hype .h-soon {
+    margin-top: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    color: #ffd98a;
+  }
+  .page-title { font-family: Georgia, serif; font-size: 1.1rem; color: #2b2b28; margin-bottom: 6px; }
+  .page-sub { font-size: 0.72rem; color: #8a8a82; margin-bottom: 22px; text-align: center; }
+
+  .phone {
+    width: 390px;
+    background: #111;
+    border-radius: 44px;
+    padding: 12px;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+  }
+  .screen {
+    background: var(--yt-bg);
+    border-radius: 34px;
+    overflow: hidden;
+    height: 780px;
+    display: flex;
+    flex-direction: column;
+  }
+  .notch { width: 120px; height: 26px; background: #111; border-radius: 0 0 16px 16px; margin: 0 auto; }
+  .statusbar { display: flex; justify-content: space-between; color: #ddd; font-size: 0.62rem; padding: 6px 20px 4px; }
+
+  /* ── video area ── */
+  .video {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: linear-gradient(135deg, #3a3f44 0%, #23272b 60%, #1a1d20 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scene { display: none; }
+
+  /* animated two-character scene */
+  .stage {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, #2b3438 0%, #23272b 55%, #1a1d20 100%);
+  }
+  .stage .wall-art {
+    position: absolute; top: 14%; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.22); font-size: 0.62rem; letter-spacing: 0.14em;
+    text-transform: uppercase; text-align: center; line-height: 1.9;
+  }
+  .counter {
+    position: absolute; bottom: 22%; left: 8%; right: 8%; height: 16px;
+    background: #4d3a28; border-radius: 4px;
+    box-shadow: 0 3px 0 #352718;
+  }
+  .char { position: absolute; bottom: 22%; width: 56px; }
+  .char.customer { left: 16%; }
+  .char.uncle { right: 16%; }
+  .char .bubble {
+    position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
+    width: 22px; height: 14px; border: 2px solid rgba(255,255,255,0.55);
+    border-radius: 8px; opacity: 0; transition: opacity 0.3s;
+  }
+  .char .bubble::after {
+    content: ""; position: absolute; bottom: -6px; left: 8px;
+    width: 6px; height: 6px; border-right: 2px solid rgba(255,255,255,0.55);
+    border-bottom: 2px solid rgba(255,255,255,0.55); transform: rotate(45deg);
+  }
+  .char.speaking .bubble { opacity: 1; animation: pulse 1s ease-in-out infinite; }
+  .char .figure { position: relative; display: flex; flex-direction: column; align-items: center; }
+  .char .head {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #d9a679; position: relative; z-index: 2;
+  }
+  .char .head::before { /* eyes */
+    content: ""; position: absolute; top: 9px; left: 6px;
+    width: 3px; height: 3px; border-radius: 50%; background: #333;
+    box-shadow: 10px 0 0 #333;
+  }
+  .char .head::after { /* mouth */
+    content: ""; position: absolute; top: 16px; left: 9px;
+    width: 8px; height: 3px; border-radius: 2px; background: #7a4a2a;
+    transition: transform 0.15s;
+  }
+  .char.speaking .head::after { animation: talk 0.35s ease-in-out infinite alternate; }
+  .char .cap { /* hair / songkok cap */
+    position: absolute; top: -6px; left: -1px; width: 28px; height: 12px;
+    border-radius: 10px 10px 0 0; background: #30302e;
+  }
+  .char.uncle .cap { height: 8px; top: -4px; }
+  .char .body {
+    width: 40px; height: 34px; border-radius: 12px 12px 4px 4px;
+    margin-top: 2px;
+  }
+  .char.customer .body { background: #4a6b5d; }
+  .char.uncle .body { background: #8a4a3c; }
+  .char.speaking .figure { animation: bob 0.8s ease-in-out infinite; }
+
+  .video.paused .stage * { animation-play-state: paused !important; }
+  .video.paused .big-play { display: block; }
+
+  /* tap-to-pause flash indicator (YouTube style) */
+  .flash {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.6);
+    width: 64px; height: 64px; border-radius: 50%;
+    background: rgba(0,0,0,0.65);
+    color: #fff; font-size: 1.4rem;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .flash.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  @keyframes talk {
+    from { transform: scaleY(0.6); }
+    to   { transform: scaleY(2.2) translateY(1px); }
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-3px); }
+  }
+  @keyframes pulse {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50%      { transform: translateX(-50%) scale(1.25); }
+  }
+  .yt-logo {
+    position: absolute; top: 10px; left: 12px;
+    color: #fff; font-weight: bold; font-size: 0.72rem; letter-spacing: -0.02em;
+    display: flex; align-items: center; gap: 5px; opacity: 0.9;
+  }
+  .yt-logo .play-badge { background: #f00; border-radius: 4px; padding: 1px 5px; font-size: 0.6rem; }
+  .video-strip { position: absolute; bottom: 0; left: 0; right: 0; padding: 0 14px 8px; }
+  .track { height: 3px; background: rgba(255,255,255,0.25); border-radius: 2px; cursor: pointer; }
+  .track-fill { height: 100%; background: #f00; border-radius: 2px; width: 0%; transition: width 0.5s linear; }
+  .vlog { display: flex; justify-content: space-between; color: rgba(255,255,255,0.85); font-size: 0.62rem; padding: 6px 2px 0; }
+
+  /* ── video meta (YouTube style) ── */
+  .meta { padding: 12px 14px 4px; }
+  .vid-title { font-size: 0.92rem; font-weight: 600; line-height: 1.35; margin-bottom: 8px; }
+  .channel-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #6b8f7d, #3c5a4c);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: bold; color: #fff;
+  }
+  .chan-info { flex: 1; }
+  .chan-name { font-size: 0.78rem; font-weight: 600; }
+  .chan-subs { font-size: 0.62rem; color: var(--yt-muted); }
+  .subscribe {
+    background: #f1f1f1; color: #0f0f0f; border: none; border-radius: 18px;
+    padding: 8px 14px; font-size: 0.72rem; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+  }
+  .subscribe.subbed { background: var(--yt-surface); color: var(--yt-muted); border: 1px solid #3a3a3a; }
+  .actions { display: flex; gap: 6px; margin-bottom: 4px; }
+  .chip {
+    display: flex; align-items: center; gap: 5px;
+    background: var(--yt-surface); border: none; border-radius: 18px;
+    color: var(--yt-text); padding: 8px 12px; font-size: 0.7rem;
+    cursor: pointer; font-family: inherit;
+  }
+  .chip:hover { background: #2a2a2a; }
+  .chip.like-seg { padding: 0; overflow: hidden; display: flex; }
+  .chip.like-seg span { padding: 8px 12px; display: flex; align-items: center; gap: 5px; }
+  .chip.like-seg span + span { border-left: 1px solid #3a3a3a; }
+
+  .desc {
+    background: var(--yt-surface); border-radius: 10px;
+    padding: 10px 12px; font-size: 0.68rem; color: var(--yt-muted);
+    margin: 6px 0 4px; cursor: pointer;
+  }
+  .desc b { color: var(--yt-text); font-weight: 600; }
+
+  /* ── subtitle bar: the special dual-language card ── */
+  .sub-card {
+    background: var(--yt-surface);
+    border: 1px solid var(--accent-border);
+    margin: 8px 14px;
+    border-radius: 14px;
+    padding: 12px 14px;
+    flex: none;
+  }
+  .sub-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .sub-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.62rem; font-weight: 600; color: #fff;
+    background: var(--yt-accent); border-radius: 4px; padding: 2px 8px;
+    letter-spacing: 0.04em;
+  }
+  .sub-time { font-size: 0.62rem; color: var(--yt-muted); }
+  .line-en { font-size: 0.85rem; color: var(--yt-muted); margin-bottom: 6px; line-height: 1.45; }
+  .line-de { font-size: 1rem; color: #a9c7b8; line-height: 1.55; font-weight: 500; }
+  .tag { font-size: 0.55rem; letter-spacing: 0.12em; color: var(--yt-muted); display: block; margin-bottom: 2px; text-transform: uppercase; }
+  .word { cursor: pointer; border-radius: 4px; padding: 1px 2px; transition: background 0.15s; user-select: none; -webkit-user-select: none; touch-action: none; }
+  .word:hover { background: var(--accent-soft); }
+  .word.active { background: #3a5548; }
+  .word.foreign { color: #e07a7a; }
+  .word.foreign.active { background: #4a3030; }
+
+  .meaning {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    max-height: 0; opacity: 0; overflow: hidden;
+    padding: 0 12px; margin: 0;
+    transition: max-height 0.25s ease, opacity 0.25s ease, padding 0.25s ease, margin 0.25s ease;
+  }
+  .meaning.show { max-height: 200px; opacity: 1; padding: 10px 12px; margin-top: 10px; }
+  .meaning .m-word { font-size: 0.95rem; color: #a9c7b8; font-weight: 600; }
+  .meaning .m-pos { color: var(--yt-muted); font-style: italic; font-size: 0.66rem; margin-left: 6px; }
+  .meaning .m-def { margin-top: 3px; color: var(--yt-text); }
+  .meaning .m-ex { margin-top: 5px; color: #8fb3a2; }
+  .meaning .m-close {
+    float: right; background: none; border: none; color: var(--yt-muted);
+    cursor: pointer; font-size: 0.85rem;
+  }
+
+  /* controls now live inside the subtitle card */
+  .card-controls { display: flex; gap: 6px; margin-top: 10px; }
+  .ctrl-btn {
+    flex: 1; background: #26332c; color: #cfe3d8;
+    border: 1px solid var(--accent-border); border-radius: 8px; padding: 8px 0;
+    font-family: inherit; font-size: 0.7rem; cursor: pointer;
+  }
+  .ctrl-btn:hover { border-color: #5a7a6a; }
+  .ctrl-btn.primary { background: var(--yt-accent); border-color: var(--yt-accent); color: #fff; }
+
+  /* ── comments + suggested (YouTube style) ── */
+  .more { padding: 4px 14px 14px; overflow-y: auto; flex: 1; }
+  .section-h { font-size: 0.78rem; font-weight: 600; margin: 10px 0 8px; }
+  .comment { display: flex; gap: 10px; margin-bottom: 12px; }
+  .c-avatar { width: 26px; height: 26px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: bold; color: #fff; }
+  .c-body { font-size: 0.7rem; line-height: 1.4; }
+  .c-body .c-name { font-weight: 600; font-size: 0.66rem; }
+  .c-body .c-text { color: var(--yt-text); }
+  .c-body .c-meta { color: var(--yt-muted); font-size: 0.6rem; margin-top: 3px; }
+
+  .sugg { display: flex; gap: 10px; margin-bottom: 12px; cursor: pointer; }
+  .thumb { width: 128px; aspect-ratio: 16/9; border-radius: 8px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+  .s-info { font-size: 0.7rem; line-height: 1.35; }
+  .s-info .s-title { font-weight: 600; color: var(--yt-text); }
+  .s-info .s-chan { color: var(--yt-muted); font-size: 0.62rem; margin-top: 2px; }
+
+  .controls { display: flex; gap: 8px; margin: 0 12px 12px; margin-top: auto; }
+  .ctrl-btn {
+    flex: 1; background: var(--yt-surface); color: var(--yt-text);
+    border: 1px solid #3a3a3a; border-radius: 10px; padding: 10px 0;
+    font-family: inherit; font-size: 0.72rem; cursor: pointer;
+  }
+  .ctrl-btn:hover { border-color: #666; }
+  .ctrl-btn.primary { background: var(--yt-accent); border-color: var(--yt-accent); color: #fff; }
+
+  .caption-note { max-width: 390px; font-size: 0.68rem; color: #8a8a82; margin-top: 18px; text-align: center; line-height: 1.7; }
+</style>
+</head>
+<body>
+  <div class="hype">
+    <span class="h-badge">Dual Subtitle Reader</span>
+    <div class="h-title">Learn languages inside real videos 🎬</div>
+    <div class="h-text">Tap any subtitle word or drag across a phrase while you watch — instant meanings, real conversations, German &amp; more. The full Android app is on its way.</div>
+    <div class="h-soon">Coming soon</div>
+  </div>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>▮▮▮ ⌁ ▭</span></div>
+
+      <div class="video paused" id="video">
+        <div class="stage">
+          <div class="wall-art">“Malay with Maiah”<br>Ep. 12 — Order at the mamak stall</div>
+          <div class="char customer" id="charCustomer">
+            <div class="bubble"></div>
+            <div class="figure">
+              <div class="head"><div class="cap"></div></div>
+              <div class="body"></div>
+            </div>
+          </div>
+          <div class="char uncle" id="charUncle">
+            <div class="bubble"></div>
+            <div class="figure">
+              <div class="head"><div class="cap"></div></div>
+              <div class="body"></div>
+            </div>
+          </div>
+          <div class="counter"></div>
+        </div>
+        <div class="yt-logo"><span class="play-badge">▶</span> YouTube</div>
+        <button class="big-play" id="bigPlay" aria-label="Play">▶</button>
+        <div class="flash" id="flash">⏸</div>
+        <div class="video-strip">
+          <div class="track"><div class="track-fill" id="trackFill"></div></div>
+          <div class="vlog"><span id="vTime">0:03</span><span>0:29</span></div>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div class="vid-title">Ordering at a mamak stall — easy Malay for beginners 🇲🇾 (Ep. 12)</div>
+        <div class="channel-row">
+          <div class="avatar">M</div>
+          <div class="chan-info">
+            <div class="chan-name">Malay with Maiah</div>
+            <div class="chan-subs">demo channel · sample data</div>
+          </div>
+          <button class="subscribe" id="subBtn">Subscribe</button>
+        </div>
+        <div class="actions">
+          <div class="chip like-seg">
+            <span id="likeBtn">👍 2.1K</span><span>👎</span>
+          </div>
+          <button class="chip">↗ Share</button>
+          <button class="chip">⬇ Download</button>
+          <button class="chip">✂ Clip</button>
+          <button class="chip">⋯</button>
+        </div>
+        <div class="desc" id="desc">
+          <b>24K views · 2 days ago</b><br>
+          Learn real Malay the easy way. In this episode we order breakfast at a mamak stall… <i>more</i>
+        </div>
+      </div>
+
+      <div class="sub-card">
+        <div class="sub-head">
+          <span class="sub-badge">DE · Dual subtitles</span>
+          <span class="sub-time" id="subTime">0:03</span>
+        </div>
+        <div class="line-en"><span class="tag">English</span><span id="lineEn"></span></div>
+        <div class="line-de"><span class="tag">Deutsch</span><span id="lineDe"></span></div>
+        <div class="meaning" id="meaning">
+          <button class="m-close" id="mClose">✕</button>
+          <span class="m-word" id="mWord"></span><span class="m-pos" id="mPos"></span>
+          <div class="m-def" id="mDef"></div>
+          <div class="m-ex" id="mEx"></div>
+        </div>
+        <div class="card-controls">
+          <button class="ctrl-btn" id="prevBtn">‹ Prev line</button>
+          <button class="ctrl-btn primary" id="playBtn">Pause</button>
+          <button class="ctrl-btn" id="nextBtn">Next line ›</button>
+        </div>
+      </div>
+
+      <div class="more">
+        <div class="section-h">Comments · 214</div>
+        <div class="comment">
+          <div class="c-avatar" style="background:#5c7a9e">A</div>
+          <div class="c-body">
+            <div><span class="c-name">@amirul.h</span> <span class="c-meta">· 1 day ago</span></div>
+            <div class="c-text">Die Serie hilft mir wirklich, schnell Malay zu lernen! 😄</div>
+            <div class="c-meta">👍 48 · 👎 · Reply</div>
+          </div>
+        </div>
+        <div class="comment">
+          <div class="c-avatar" style="background:#9e5c72">L</div>
+          <div class="c-body">
+            <div><span class="c-name">@lena_w</span> <span class="c-meta">· 3 days ago</span></div>
+            <div class="c-text">Roti canai ist mein Favorit. greetings from Berlin!</div>
+            <div class="c-meta">👍 23 · 👎 · Reply</div>
+          </div>
+        </div>
+
+        <div class="section-h">Up next</div>
+        <div class="sugg">
+          <div class="thumb" style="background:#2e4a3d">🍜</div>
+          <div class="s-info">
+            <div class="s-title">Pasar malam food tour — 10 phrases you need</div>
+            <div class="s-chan">Malay with Maiah · sample · 12:40</div>
+          </div>
+        </div>
+        <div class="sugg">
+          <div class="thumb" style="background:#3d2e4a">🚆</div>
+          <div class="s-info">
+            <div class="s-title">Taking the LRT: asking for directions in Malay</div>
+            <div class="s-chan">Malay with Maiah · sample · 8:15</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+// Simulated video: each "scene moment" is one subtitle pair.
+const LINES = [
+  {
+    t: "0:03", speaker: "customer", en: "Teh tarik for me, please. Less sweet.",
+    de: "Ein Teh Tarik für mich, bitte. Nicht so süß.",
+    foreign: ["teh", "tarik"],
+    dict: {
+      "ein": {pos:"article",def:"a / one",ex:"Ein Tee, bitte. — One tea, please."},
+      "für mich": {pos:"phrase",def:"for me",ex:"Der Kaffee ist für mich. — The coffee is for me."},
+      "bitte": {pos:"adverb",def:"please",ex:"Noch ein Glas, bitte. — Another glass, please."},
+      "nicht so": {pos:"phrase",def:"not so / not too",ex:"Nicht so schnell! — Not so fast!"},
+      "süß": {pos:"adjective",def:"sweet",ex:"Der Kuchen ist sehr süß. — The cake is very sweet."},
+      "teh tarik": {pos:"loanword (Malay)",def:"pulled milk tea — a Malaysian favourite",ex:"Teh Tarik schmeckt cremig. — Pulled tea tastes creamy."}
+    }
+  },
+  {
+    t: "0:09", speaker: "uncle", en: "Two roti canai, one with egg.",
+    de: "Zwei Roti Canai, eins mit Ei.",
+    foreign: ["roti", "canai"],
+    dict: {
+      "zwei": {pos:"number",def:"two",ex:"Zwei Teh O, bitte. — Two plain teas, please."},
+      "eins": {pos:"number",def:"one",ex:"Eins davon ist für mich. — One of them is for me."},
+      "mit": {pos:"preposition",def:"with",ex:"Kopi mit Eis. — Coffee with ice."},
+      "ei": {pos:"noun (n)",def:"egg",ex:"Das Ei ist weich. — The egg is soft."},
+      "roti canai": {pos:"loanword (Malay)",def:"flaky flatbread from the griddle",ex:"Roti Canai ist knusprig. — Roti canai is crispy."}
+    }
+  },
+  {
+    t: "0:15", speaker: "customer", en: "Uncle, the bill please. How much?",
+    de: "Onkel, die Rechnung bitte. Wie viel?",
+    dict: {
+      "onkel": {pos:"noun (m)",def:"uncle (also a friendly way to address an older man)",ex:"Onkel, danke vielmals. — Uncle, thanks a lot."},
+      "die rechnung": {pos:"noun (f)",def:"the bill / check",ex:"Die Rechnung, bitte. — The bill, please."},
+      "wie viel": {pos:"phrase",def:"how much",ex:"Wie viel kostet das? — How much does that cost?"}
+    }
+  },
+  {
+    t: "0:19", speaker: "uncle", en: "Here you go. Careful, the tea is hot!",
+    de: "Hier, bitte. Vorsicht, der Tee ist heiß!",
+    dict: {
+      "hier": {pos:"adverb",def:"here",ex:"Hier, bitte schön. — Here you are."},
+      "vorsicht": {pos:"phrase",def:"careful! / watch out!",ex:"Vorsicht, die Straße ist nass. — Careful, the road is wet."},
+      "der tee": {pos:"noun (m)",def:"the tea",ex:"Der Tee ist frisch. — The tea is fresh."},
+      "heiß": {pos:"adjective",def:"hot",ex:"Die Suppe ist heiß. — The soup is hot."}
+    }
+  },
+  {
+    t: "0:24", speaker: "customer", en: "Thank you very much, uncle!",
+    de: "Vielen Dank, Onkel!",
+    dict: {
+      "vielen dank": {pos:"phrase",def:"thank you very much / many thanks",ex:"Vielen Dank für das Essen. — Many thanks for the meal."},
+      "dank": {pos:"noun (m)",def:"thanks / gratitude",ex:"Ein großes Dankeschön. — A big thank you."}
+    }
+  }
+];
+
+let idx = 0;
+let playing = false;
+let timer = null;
+let seconds = 3;
+
+const video = document.getElementById("video");
+const bigPlay = document.getElementById("bigPlay");
+const trackFill = document.getElementById("trackFill");
+const vTime = document.getElementById("vTime");
+const subTime = document.getElementById("subTime");
+const elEn = document.getElementById("lineEn");
+const elDe = document.getElementById("lineDe");
+const meaning = document.getElementById("meaning");
+
+function fmt(s){ return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
+
+function renderLine() {
+  const L = LINES[idx];
+  subTime.textContent = L.t;
+  vTime.textContent = fmt(seconds);
+  elEn.textContent = L.en;
+  elDe.innerHTML = "";
+  // words that are proper nouns / Malay loanwords (not German) get marked "foreign"
+  const foreign = L.foreign || [];
+  L.de.split(" ").forEach((w) => {
+    const span = document.createElement("span");
+    const clean = w.replace(/[.,!?]/g, "").toLowerCase();
+    span.className = "word" + (foreign.includes(clean) ? " foreign" : "");
+    span.dataset.word = clean;
+    span.textContent = w + " ";
+    span.addEventListener("pointerdown", onWordDown);
+    span.addEventListener("pointerover", onWordOver);
+    span.addEventListener("pointerup", onWordUp);
+    elDe.appendChild(span);
+  });
+  meaning.classList.remove("show");
+  trackFill.style.width = (seconds / DURATION * 100) + "%";
+  // the character whose line it is starts talking
+  document.getElementById("charCustomer").classList.toggle("speaking", L.speaker === "customer");
+  document.getElementById("charUncle").classList.toggle("speaking", L.speaker === "uncle");
+}
+
+// drag-to-select: press on a word, drag across words, release to look up the phrase
+let dragFrom = null;   // word index where the press started
+let dragTo = null;     // last word index hovered during the drag
+let dragging = false;  // true once the pointer moved to a different word
+
+function clearSelection() {
+  elDe.querySelectorAll(".active").forEach(x => x.classList.remove("active"));
+}
+
+function highlightRange(a, b) {
+  clearSelection();
+  const from = Math.min(a, b), to = Math.max(a, b);
+  elDe.querySelectorAll(".word").forEach((w, i) => {
+    if (i >= from && i <= to) w.classList.add("active");
+  });
+  return [from, to];
+}
+
+function onWordDown(e) {
+  const words = Array.from(elDe.querySelectorAll(".word"));
+  dragFrom = words.indexOf(e.target);
+  dragTo = dragFrom;
+  dragging = false;
+  e.preventDefault(); // stop native text selection from fighting the drag
+}
+
+function onWordOver(e) {
+  if (dragFrom === null) return;
+  const words = Array.from(elDe.querySelectorAll(".word"));
+  const i = words.indexOf(e.target);
+  if (i < 0 || i === dragTo) return;
+  dragging = true;               // moved onto another word -> it's a drag
+  dragTo = i;
+  highlightRange(dragFrom, dragTo);
+}
+
+function onWordUp(e) {
+  if (dragFrom === null) return;
+  const words = Array.from(elDe.querySelectorAll(".word"));
+  const dict = LINES[idx].dict;
+  setPlaying(false);             // looking up a meaning pauses the video
+
+  if (dragging && dragTo !== dragFrom) {
+    // phrase lookup over the dragged range
+    const [from, to] = highlightRange(dragFrom, dragTo);
+    const key = words.slice(from, to + 1).map(x => x.dataset.word).join(" ");
+    showMeaning(key, dict);
+  } else {
+    // plain click: single word
+    clearSelection();
+    words[dragFrom].classList.add("active");
+    showMeaning(words[dragFrom].dataset.word, dict);
+  }
+  dragFrom = null; dragTo = null; dragging = false;
+}
+
+// release outside any word (or off the card) still resolves the lookup
+document.addEventListener("pointerup", (ev) => {
+  if (dragFrom !== null) onWordUp(ev);
+});
+
+function onWord(e) {
+  // retained for compatibility; drag handlers above do the real work
+}
+const MARKS = [3, 9, 15, 19, 24]; // subtitle timestamps in seconds
+const DURATION = 29; // fake video length
+
+function secondsFor(t) {
+  const [m, s] = t.split(":").map(Number);
+  return m * 60 + s;
+}
+
+// move the fake video playhead to a line's timestamp (video also pauses)
+function seekToLine(i) {
+  idx = i;
+  setPlaying(false);
+  seconds = secondsFor(LINES[idx].t);
+  renderLine();
+}
+
+function showMeaning(key, dict) {
+  const d = dict[key];
+  document.getElementById("mWord").textContent = key;
+  document.getElementById("mPos").textContent = d ? d.pos : "";
+  document.getElementById("mEx").textContent = d ? d.ex : "";
+
+  if (d) {
+    document.getElementById("mDef").textContent = d.def;
+  } else {
+    // phrase not in the demo dictionary: translate each known word individually
+    const parts = key.split(" ");
+    const known = parts
+      .map(w => dict[w] ? `${w} — ${dict[w].def}` : null)
+      .filter(Boolean);
+    if (known.length) {
+      document.getElementById("mPos").textContent = "individual word meanings";
+      document.getElementById("mDef").innerHTML =
+        "This full phrase isn't in the demo dictionary yet — here is each word on its own:<br>" +
+        known.map(k => "• " + k).join("<br>");
+    } else {
+      document.getElementById("mPos").textContent = "not in demo dictionary";
+      document.getElementById("mDef").textContent = "No demo entry for this phrase yet — try a single word.";
+    }
+  }
+  meaning.classList.add("show");
+}
+
+document.getElementById("mClose").addEventListener("click", () => {
+  meaning.classList.remove("show");
+  clearSelection();
+});
+
+// small YouTube-style interactions
+document.getElementById("subBtn").addEventListener("click", function() {
+  this.classList.toggle("subbed");
+  this.textContent = this.classList.contains("subbed") ? "Subscribed ✓" : "Subscribe";
+});
+document.getElementById("likeBtn").addEventListener("click", function() {
+  this.textContent = this.textContent.includes("2.1K") ? "👍 2.2K" : "👍 2.1K";
+});
+
+function tick() {
+  seconds++;
+  if (seconds >= DURATION) seconds = 0;
+  let ni = 0;
+  MARKS.forEach((m, i) => { if (seconds >= m) ni = i; });
+  if (ni !== idx) { idx = ni; renderLine(); }
+  else { vTime.textContent = fmt(seconds); trackFill.style.width = (seconds/DURATION*100) + "%"; }
+}
+
+function setPlaying(p) {
+  playing = p;
+  video.classList.toggle("paused", !p);
+  document.getElementById("playBtn").textContent = p ? "Pause" : "Play";
+  if (p) timer = setInterval(tick, 1000);
+  else clearInterval(timer);
+}
+
+// tap the video itself to toggle play/pause, with a YouTube-style flash
+const flash = document.getElementById("flash");
+let flashTimer = null;
+video.addEventListener("click", (e) => {
+  if (e.target === bigPlay) return; // big play button has its own handler
+  const wasPlaying = playing;
+  setPlaying(!wasPlaying);
+  flash.textContent = wasPlaying ? "⏸" : "▶";
+  flash.classList.add("show");
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => flash.classList.remove("show"), 600);
+});
+
+document.getElementById("playBtn").addEventListener("click", () => setPlaying(!playing));
+bigPlay.addEventListener("click", () => setPlaying(true));
+document.getElementById("nextBtn").addEventListener("click", () => seekToLine(Math.min(idx+1, LINES.length-1)));
+document.getElementById("prevBtn").addEventListener("click", () => seekToLine(Math.max(idx-1, 0)));
+
+renderLine();
+</script>
+</body>
+</html>
